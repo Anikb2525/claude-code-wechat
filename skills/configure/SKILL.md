@@ -74,32 +74,19 @@ offer.
 
 ### `login` — QR login flow
 
-Uses a single login script that handles the entire flow: QR display → poll → save credentials.
-
-Find the plugin root by looking for `login.ts`:
-
-```
-~/.claude/plugins/cache/*/wechat/*/login.ts
-```
-
-Or use the original source path if loaded via `--plugin-dir`. Use `ls` to
-resolve the wildcard and get the actual path.
-
-If credentials already exist, read them and warn the user: *"已有凭据
-(accountId: `<accountId>`). 继续登录将覆盖。是否继续？"* — wait for
-confirmation before proceeding.
-
 **Before running the script**, tell the user:
 *"脚本运行后，请按 ctrl+o 展开输出查看完整二维码，或直接在微信中打开输出中的链接完成登录。"*
 
-**Run the login script:**
+Then run directly:
 
 ```bash
-bun <plugin-root>/login.ts
+bun login.ts
 ```
 
 **This is a long-running command** — it renders a QR code, then polls for scan
 confirmation. It may take up to 8 minutes. **Set timeout to at least 8 minutes.**
+
+Do NOT read credentials first. Do NOT search for the script path. Just run it.
 
 The script handles everything:
 - Renders QR code in terminal
