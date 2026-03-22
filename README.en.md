@@ -8,7 +8,7 @@ WeChat channel plugin for Claude Code — bridge WeChat messages into your Claud
 
 - **[Claude Code](https://claude.com/claude-code)** v2.1.80+
 - **[Bun](https://bun.sh)** — `curl -fsSL https://bun.sh/install | bash`
-- **WeChat (iOS)** with ClawBot enabled
+- **WeChat (iOS)** 8.0.70+
 
 ## Install
 

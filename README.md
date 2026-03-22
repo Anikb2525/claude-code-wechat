@@ -8,7 +8,7 @@
 
 - **[Claude Code](https://claude.com/claude-code)** v2.1.80+
 - **[Bun](https://bun.sh)** — `curl -fsSL https://bun.sh/install | bash`
-- **微信 (iOS)** 并开启 ClawBot
+- **微信 (iOS)** 8.0.70+
 
 ## 安装
 
