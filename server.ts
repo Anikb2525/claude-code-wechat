@@ -44,19 +44,10 @@ const CDN_BASE_URL = DEFAULT_CDN_BASE_URL
 const INBOX_DIR = join(STATE_DIR, 'inbox')
 const SYNC_BUF_FILE = join(STATE_DIR, 'sync_buf.txt')
 
-// --- Context token cache ---
-// Bounded context token cache — keeps latest 100 entries
-const MAX_CONTEXT_TOKENS = 100
-const contextTokenMap = new Map<string, string>()
-
-function setContextToken(userId: string, token: string): void {
-  contextTokenMap.set(userId, token)
-  if (contextTokenMap.size > MAX_CONTEXT_TOKENS) {
-    // Delete oldest entry (first inserted)
-    const oldest = contextTokenMap.keys().next().value
-    if (oldest) contextTokenMap.delete(oldest)
-  }
-}
+// --- Last sender cache ---
+// Tracks the most recent inbound sender so tools don't need user_id.
+let lastSenderId: string | undefined
+let lastContextToken: string | undefined
 
 // --- Typing indicator ---
 // Continuous typing with keepalive every 5s, explicit CANCEL on reply.
@@ -117,7 +108,7 @@ const mcp = new Server(
     instructions: [
       'The sender reads WeChat, not this session. Anything you want them to see must go through the reply, send_image, or send_file tools — your transcript output never reaches their chat.',
       '',
-      'Messages from WeChat arrive as <channel source="wechat" user_id="..." context_token="..." ts="...">. If the tag has image_path, Read that file — it is a photo the sender attached. If the tag has attachment_path, Read that file. If the tag has attachment_encrypt_query_param, call download_attachment to fetch the file, then Read the returned path. Reply with the reply tool — pass user_id and context_token back. Use send_image to send image files and send_file to send other files.',
+      'Messages from WeChat arrive as <channel source="wechat" ts="...">. If the tag has image_path, Read that file — it is a photo the sender attached. If the tag has attachment_path, Read that file. If the tag has attachment_encrypt_query_param, call download_attachment to fetch the file, then Read the returned path. Reply with the reply tool. Use send_image to send image files and send_file to send other files.',
       '',
       'WeChat does not render markdown. The reply tool auto-converts markdown to plain text. Do not manually format with markdown syntax.',
       '',
@@ -131,43 +122,37 @@ mcp.setRequestHandler(ListToolsRequestSchema, async () => ({
   tools: [
     {
       name: 'reply',
-      description: 'Reply on WeChat. Pass user_id and context_token from the inbound message. Markdown is auto-converted to plain text.',
+      description: 'Reply on WeChat. Markdown is auto-converted to plain text.',
       inputSchema: {
         type: 'object',
         properties: {
-          user_id: { type: 'string', description: 'from_user_id from the inbound message' },
           text: { type: 'string' },
-          context_token: { type: 'string', description: 'context_token from the inbound message. Required for delivery.' },
         },
-        required: ['user_id', 'text', 'context_token'],
+        required: ['text'],
       },
     },
     {
       name: 'send_image',
-      description: 'Send an image to a WeChat user. Pass absolute file path. Uploads via encrypted CDN.',
+      description: 'Send an image to the WeChat user. Uploads via encrypted CDN.',
       inputSchema: {
         type: 'object',
         properties: {
-          user_id: { type: 'string' },
           file_path: { type: 'string', description: 'Absolute path to local image file' },
-          context_token: { type: 'string' },
           caption: { type: 'string', description: 'Optional text caption sent before the image' },
         },
-        required: ['user_id', 'file_path', 'context_token'],
+        required: ['file_path'],
       },
     },
     {
       name: 'send_file',
-      description: 'Send a file attachment to a WeChat user. Pass absolute file path. Uploads via encrypted CDN.',
+      description: 'Send a file attachment to the WeChat user. Uploads via encrypted CDN.',
       inputSchema: {
         type: 'object',
         properties: {
-          user_id: { type: 'string' },
           file_path: { type: 'string', description: 'Absolute path to local file' },
-          context_token: { type: 'string' },
           caption: { type: 'string', description: 'Optional text caption sent before the file' },
         },
-        required: ['user_id', 'file_path', 'context_token'],
+        required: ['file_path'],
       },
     },
     {
@@ -192,38 +177,32 @@ mcp.setRequestHandler(CallToolRequestSchema, async req => {
     switch (req.params.name) {
       case 'reply': {
         stopTyping()
-        const userId = args.user_id as string
+        if (!lastSenderId) throw new Error('no inbound message received yet')
         const text = args.text as string
-        const contextToken = args.context_token as string
-        if (!contextToken) throw new Error('context_token is required')
         const count = await sendTextMessage({
-          toUserId: userId, text, contextToken,
+          toUserId: lastSenderId, text, contextToken: lastContextToken ?? '',
           baseUrl: BASE_URL, token: TOKEN, textChunkLimit: 4000,
         })
         return { content: [{ type: 'text', text: `sent ${count} chunk(s)` }] }
       }
       case 'send_image': {
         stopTyping()
-        const userId = args.user_id as string
+        if (!lastSenderId) throw new Error('no inbound message received yet')
         const filePath = args.file_path as string
-        const contextToken = args.context_token as string
         const caption = args.caption as string | undefined
-        if (!contextToken) throw new Error('context_token is required')
         const clientId = await uploadAndSendImage({
-          filePath, toUserId: userId, contextToken, caption,
+          filePath, toUserId: lastSenderId, contextToken: lastContextToken ?? '', caption,
           baseUrl: BASE_URL, token: TOKEN, cdnBaseUrl: CDN_BASE_URL,
         })
         return { content: [{ type: 'text', text: `image sent (id: ${clientId})` }] }
       }
       case 'send_file': {
         stopTyping()
-        const userId = args.user_id as string
+        if (!lastSenderId) throw new Error('no inbound message received yet')
         const filePath = args.file_path as string
-        const contextToken = args.context_token as string
         const caption = args.caption as string | undefined
-        if (!contextToken) throw new Error('context_token is required')
         const clientId = await uploadAndSendFile({
-          filePath, toUserId: userId, contextToken, caption,
+          filePath, toUserId: lastSenderId, contextToken: lastContextToken ?? '', caption,
           baseUrl: BASE_URL, token: TOKEN, cdnBaseUrl: CDN_BASE_URL,
         })
         return { content: [{ type: 'text', text: `file sent (id: ${clientId})` }] }
@@ -257,8 +236,9 @@ async function handleInbound(msg: WeixinMessage): Promise<void> {
   const senderId = msg.from_user_id
   if (!senderId) return
 
-  // Cache context_token
-  if (msg.context_token) setContextToken(senderId, msg.context_token)
+  // Track last sender
+  lastSenderId = senderId
+  if (msg.context_token) lastContextToken = msg.context_token
 
   // Start continuous typing (stops with CANCEL when reply is sent)
   if (typingTicket) {
@@ -271,11 +251,7 @@ async function handleInbound(msg: WeixinMessage): Promise<void> {
   const text = extractText(msg)
   const ts = msg.create_time_ms ? new Date(msg.create_time_ms).toISOString() : new Date().toISOString()
 
-  const meta: Record<string, string> = {
-    user_id: senderId,
-    ts,
-  }
-  if (msg.context_token) meta.context_token = msg.context_token
+  const meta: Record<string, string> = { ts }
 
   // Handle media
   const items = msg.item_list ?? []
