@@ -87,8 +87,11 @@ Send an image to a WeChat user via CDN upload.
 
 Behavior:
 - Reads local file, encrypts with AES-128-ECB (random 16-byte key)
-- Uploads ciphertext to CDN via `get_upload_url` + HTTP PUT
-- Sends message with CDN media reference
+- Generates thumbnail, encrypts thumbnail
+- `POST ilink/bot/getuploadurl` with file + thumbnail metadata -> `upload_param` + `thumb_upload_param`
+- HTTP POST ciphertext to CDN (Content-Type: application/octet-stream), then POST thumbnail
+- Constructs CDN media reference (encrypt_query_param + base64 aes_key)
+- `POST ilink/bot/sendmessage` with IMAGE item
 - `assertSendable` check prevents leaking channel state files
 
 ### `send_file`
@@ -102,7 +105,9 @@ Send a file attachment to a WeChat user via CDN upload.
 | `context_token` | string | yes | Required for delivery |
 | `caption` | string | no | Optional text caption sent before the file |
 
-Behavior: Same CDN upload flow as `send_image`, but constructs a FILE item type with `file_name` and `len` metadata.
+Behavior:
+- Same CDN encrypt + upload flow as `send_image`, but sets `no_need_thumb: true` (no thumbnail)
+- Constructs a FILE item type with `file_name` and `len` (plaintext size) metadata
 
 ### `download_attachment`
 
@@ -141,6 +146,14 @@ Messages arrive via `ilink/bot/getupdates` long-poll and are forwarded as `notif
 **Image eager download rationale**: CDN URLs expire. Same pattern as TG plugin's photo handling — download on arrival since there's no way to fetch later reliably.
 
 **Typing indicator**: Sent automatically on message receipt via `ilink/bot/sendtyping` (requires `typing_ticket` from `ilink/bot/getconfig`). Fire-and-forget, no tool exposed.
+
+### Long-poll State Management
+
+The `getupdates` API is stateful: each response includes a `get_updates_buf` cursor that must be passed back in the next request (empty string on first call). This cursor is persisted to `~/.claude/channels/wechat/sync_buf.txt` so the server resumes from where it left off after restart. Without correct cursor management, messages will be re-delivered or lost.
+
+### Error Handling
+
+The `getupdates` response may include `errcode` (e.g., `-14` for session timeout) in addition to `ret`. Both must be checked. On consecutive failures (max 3), back off for 30s before retrying. On session timeout, the server should log a warning suggesting re-login via `/wechat:configure login`.
 
 ## MCP Server Instructions
 
@@ -188,11 +201,14 @@ Claude calls send_image/send_file tool
   -> Read local file
   -> Generate random 16-byte AES key
   -> AES-128-ECB encrypt (PKCS7 padding) -> ciphertext
-  -> POST ilink/bot/get_upload_url (with file metadata) -> upload_param
-  -> HTTP PUT ciphertext to CDN URL
+  -> POST ilink/bot/getuploadurl (with file metadata, including thumbnail info for images) -> upload_param
+  -> HTTP POST ciphertext to CDN URL (Content-Type: application/octet-stream)
+  -> If image: also upload thumbnail via thumb_upload_param
   -> Construct CDN media reference (encrypt_query_param + base64 aes_key)
   -> POST ilink/bot/sendmessage with media item
 ```
+
+**Thumbnail handling**: For images and videos, the `getuploadurl` API expects thumbnail metadata (`thumb_rawsize`, `thumb_rawfilemd5`, `thumb_filesize`) and returns a separate `thumb_upload_param`. Thumbnails are required for proper display on the recipient's device. For files, set `no_need_thumb: true`.
 
 ## Access Control
 
@@ -361,7 +377,7 @@ All crypto via Node.js built-in `crypto`. All HTTP via built-in `fetch`. Zero he
 | `ilink/bot/sendmessage` | POST | Send outbound messages (text + media) |
 | `ilink/bot/getconfig` | POST | Get bot config (typing_ticket) |
 | `ilink/bot/sendtyping` | POST | Send typing indicator |
-| `ilink/bot/get_upload_url` | POST | Get CDN upload URL for media |
+| `ilink/bot/getuploadurl` | POST | Get CDN upload URL for media |
 
 ### Authentication Headers
 
@@ -370,7 +386,14 @@ Content-Type: application/json
 AuthorizationType: ilink_bot_token
 Authorization: Bearer <token>
 X-WECHAT-UIN: <random_base64>
+Content-Length: <body_byte_length>
 ```
+
+All POST requests must include `base_info: { channel_version: "0.1.0" }` in the JSON body. `Content-Length` must be explicitly set (byte length of the JSON body, not character length).
+
+### CDN Base URL
+
+The CDN base URL for media upload/download is distinct from the API base URL. It is derived from the `getuploadurl` response's `upload_param` field. The API base URL (default `https://ilinkai.weixin.qq.com/`) is used for all non-CDN requests.
 
 ## Out of Scope (Future Enhancements)
 
