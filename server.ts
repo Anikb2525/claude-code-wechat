@@ -13,7 +13,7 @@ import {
   CallToolRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js'
 import { randomBytes } from 'crypto'
-import { readFileSync, writeFileSync, mkdirSync } from 'fs'
+import { readFileSync, writeFileSync, renameSync, mkdirSync } from 'fs'
 import { homedir } from 'os'
 import { join } from 'path'
 
@@ -50,7 +50,18 @@ const INBOX_DIR = join(STATE_DIR, 'inbox')
 const SYNC_BUF_FILE = join(STATE_DIR, 'sync_buf.txt')
 
 // --- Context token cache ---
+// Bounded context token cache — keeps latest 100 entries
+const MAX_CONTEXT_TOKENS = 100
 const contextTokenMap = new Map<string, string>()
+
+function setContextToken(userId: string, token: string): void {
+  contextTokenMap.set(userId, token)
+  if (contextTokenMap.size > MAX_CONTEXT_TOKENS) {
+    // Delete oldest entry (first inserted)
+    const oldest = contextTokenMap.keys().next().value
+    if (oldest) contextTokenMap.delete(oldest)
+  }
+}
 
 // --- Typing ticket cache ---
 let typingTicket: string | undefined
@@ -247,7 +258,7 @@ async function handleInbound(msg: WeixinMessage): Promise<void> {
   if (!senderId) return
 
   // Cache context_token
-  if (msg.context_token) contextTokenMap.set(senderId, msg.context_token)
+  if (msg.context_token) setContextToken(senderId, msg.context_token)
 
   const result = gate(senderId)
 
@@ -316,11 +327,24 @@ async function handleInbound(msg: WeixinMessage): Promise<void> {
         process.stderr.write(`wechat channel: image download failed: ${err}\n`)
       }
     } else if (item.type === MessageItemType.VOICE && item.voice_item) {
-      // Voice: text is in extractText, pass CDN ref for optional download
+      // Voice: text is in extractText. Eagerly download silk (CDN URLs expire).
       if (item.voice_item.media?.encrypt_query_param && item.voice_item.media?.aes_key) {
-        meta.attachment_kind = 'voice'
-        meta.attachment_encrypt_query_param = item.voice_item.media.encrypt_query_param
-        meta.attachment_aes_key = item.voice_item.media.aes_key
+        try {
+          const voicePath = await downloadInboundMedia(
+            item.voice_item.media.encrypt_query_param,
+            item.voice_item.media.aes_key,
+            CDN_BASE_URL,
+            'silk',
+          )
+          meta.attachment_path = voicePath
+          meta.attachment_kind = 'voice'
+        } catch (err) {
+          process.stderr.write(`wechat channel: voice download failed: ${err}\n`)
+          // Fallback to lazy download refs
+          meta.attachment_kind = 'voice'
+          meta.attachment_encrypt_query_param = item.voice_item.media.encrypt_query_param
+          meta.attachment_aes_key = item.voice_item.media.aes_key
+        }
       }
     } else if (item.type === MessageItemType.FILE && item.file_item) {
       if (item.file_item.media?.encrypt_query_param && item.file_item.media?.aes_key) {
@@ -396,7 +420,9 @@ async function pollLoop(): Promise<void> {
       if (resp.get_updates_buf) {
         getUpdatesBuf = resp.get_updates_buf
         mkdirSync(STATE_DIR, { recursive: true })
-        writeFileSync(SYNC_BUF_FILE, getUpdatesBuf)
+        const syncTmp = SYNC_BUF_FILE + '.tmp'
+        writeFileSync(syncTmp, getUpdatesBuf)
+        renameSync(syncTmp, SYNC_BUF_FILE)
       }
 
       const msgs = resp.msgs ?? []

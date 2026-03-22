@@ -88,10 +88,8 @@ export function chunk(text: string, limit: number): string[] {
 // --- Inbound media helpers ---
 
 export function resolveAesKey(item: ImageItem): string | undefined {
-  // image_item.aeskey (hex string) takes priority
-  if (item.aeskey) {
-    return Buffer.from(item.aeskey, 'hex').toString('base64')
-  }
+  // image_item.aeskey is a raw hex string - parseAesKey handles it directly
+  if (item.aeskey) return item.aeskey
   return item.media?.aes_key
 }
 
