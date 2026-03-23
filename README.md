@@ -1,6 +1,6 @@
 # claude-code-wechat
 
-微信频道插件，通过 iLink Bot API 将微信消息接入 Claude Code 会话。支持文字、图片、文件、视频和语音收发。
+claude code微信插件，通过 iLink Bot API 将微信消息接入 Claude Code Channel。支持文字、图片、文件、视频和语音收发。
 
 [English](./README.en.md)
 
